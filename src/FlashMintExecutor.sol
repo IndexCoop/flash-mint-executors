@@ -25,8 +25,6 @@ import {IFlashMintDexV5} from "./interfaces/IFlashMintDexV5.sol";
  * The callbackData passed into reactorCallback must be ABI-encoded as:
  *
  *   abi.encode(
- *       address[] tokensToApproveForFlashMint, // Tokens to approve for the FlashMint contract
- *       address[] tokensToApproveForReactor,    // Tokens to approve for the reactor
  *       address setToken,                      // The SetToken to issue or redeem
  *       uint256 setAmount,                      // The SetToken amount to issue/redeem
  *       address inputOutputToken,               // The ERC20 token used as input (issuance) or desired output (redemption)
@@ -103,8 +101,6 @@ contract FlashMintExecutor is IReactorCallback, Owned {
      * @notice UniswapX reactor callback that fills orders via the appropriate FlashMint contract.
      *
      * The callbackData is ABI-decoded as follows:
-     * - address[] tokensToApproveForFlashMint: tokens to approve for the FlashMint contract.
-     * - address[] tokensToApproveForReactor: tokens to approve for the reactor.
      * - address setToken: the SetToken to issue or redeem.
      * - uint256 setAmount: the SetToken amount to issue/redeem.
      * - address inputOutputToken: the ERC20 token used as input (issuance) or desired output (redemption).
@@ -115,8 +111,6 @@ contract FlashMintExecutor is IReactorCallback, Owned {
      */
     function reactorCallback(ResolvedOrder[] calldata, bytes calldata callbackData) external override onlyReactor {
         (
-            address[] memory tokensToApproveForFlashMint,
-            address[] memory tokensToApproveForReactor,
             address setToken,
             uint256 setAmount,
             address inputOutputToken,
@@ -127,8 +121,6 @@ contract FlashMintExecutor is IReactorCallback, Owned {
         ) = abi.decode(
             callbackData,
             (
-                address[],
-                address[],
                 address,
                 uint256,
                 address,
@@ -141,12 +133,12 @@ contract FlashMintExecutor is IReactorCallback, Owned {
 
         IFlashMintDexV5 flashMintContract = getFlashMintContract(setToken);
         unchecked {
-            for (uint256 i = 0; i < tokensToApproveForFlashMint.length; i++) {
-                ERC20(tokensToApproveForFlashMint[i]).safeApprove(address(flashMintContract), type(uint256).max);
-            }
-            for (uint256 i = 0; i < tokensToApproveForReactor.length; i++) {
-                ERC20(tokensToApproveForReactor[i]).safeApprove(address(reactor), type(uint256).max);
-            }
+            (address setTokenApproveTarget, address inputOutputTokenApproveTarget) = isIssuance 
+                ? (address(reactor), address(flashMintContract)) 
+                : (address(flashMintContract), address(reactor));
+
+            ERC20(setToken).safeApprove(setTokenApproveTarget, type(uint256).max);
+            ERC20(inputOutputToken).safeApprove(inputOutputTokenApproveTarget, type(uint256).max);
         }
 
         if (isIssuance) {
