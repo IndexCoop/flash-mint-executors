@@ -7,3 +7,6 @@
 [submodule "lib/index-protocol"]
 	path = lib/index-protocol
 	url = https://github.com/indexcoop/index-protocol
+[submodule "lib/index-coop-smart-contracts"]
+	path = lib/index-coop-smart-contracts
+	url = https://github.com/indexcoop/index-coop-smart-contracts
