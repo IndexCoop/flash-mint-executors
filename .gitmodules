@@ -4,3 +4,6 @@
 [submodule "lib/uniswapx"]
 	path = lib/uniswapx
 	url = https://github.com/uniswap/uniswapx
+[submodule "lib/index-protocol"]
+	path = lib/index-protocol
+	url = https://github.com/indexcoop/index-protocol
