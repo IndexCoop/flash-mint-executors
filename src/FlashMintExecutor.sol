@@ -23,7 +23,7 @@ import {IFlashMintDexV5} from "./interfaces/IFlashMintDexV5.sol";
  * FlashMint function.
  *
  * The callbackData passed into reactorCallback must be ABI-encoded as:
- * 
+ *
  *   abi.encode(
  *       address[] tokensToApproveForFlashMint, // Tokens to approve for the FlashMint contract
  *       address[] tokensToApproveForReactor,    // Tokens to approve for the reactor
@@ -59,10 +59,7 @@ contract FlashMintExecutor is IReactorCallback, Owned {
         _;
     }
 
-    constructor(
-        IReactor _reactor,
-        address _owner
-    ) Owned(_owner) {
+    constructor(IReactor _reactor, address _owner) Owned(_owner) {
         reactor = _reactor;
     }
 
@@ -116,10 +113,7 @@ contract FlashMintExecutor is IReactorCallback, Owned {
      * - IFlashMintDexV5.SwapData swapDataInputOutputToken: swap data for the input/output token.
      * - bool isIssuance: true for issuance, false for redemption.
      */
-    function reactorCallback(
-        ResolvedOrder[] calldata, 
-        bytes calldata callbackData
-    ) external override onlyReactor {
+    function reactorCallback(ResolvedOrder[] calldata, bytes calldata callbackData) external override onlyReactor {
         (
             address[] memory tokensToApproveForFlashMint,
             address[] memory tokensToApproveForReactor,

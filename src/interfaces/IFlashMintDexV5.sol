@@ -15,36 +15,43 @@ interface IFlashMintDexV5 {
         address[] path;
         uint24[] fees;
         int24[] tickSpacing;
-        address pool;         // For Curve swaps
-        bytes32[] poolIds;    // For Balancer V2 multihop swaps
+        address pool; // For Curve swaps
+        bytes32[] poolIds; // For Balancer V2 multihop swaps
         uint8 exchange;
     }
 
     /* ============ Events ============ */
 
-    event FlashMint(
-        address indexed _recipient,     // The recipient address of the issued SetTokens
-        address indexed _setToken,    // The issued SetToken
-        address indexed _inputToken,    // The address of the input asset(ERC20/ETH) used to issue the SetTokens
-        uint256 _amountInputToken,      // The amount of input tokens used for issuance
-        uint256 _amountSetIssued        // The amount of SetTokens received by the recipient
+    event FlashMint( // The recipient address of the issued SetTokens
+        // The issued SetToken
+        // The address of the input asset(ERC20/ETH) used to issue the SetTokens
+        // The amount of input tokens used for issuance
+        // The amount of SetTokens received by the recipient
+        address indexed _recipient,
+        address indexed _setToken,
+        address indexed _inputToken,
+        uint256 _amountInputToken,
+        uint256 _amountSetIssued
     );
 
-    event FlashRedeem(
-        address indexed _recipient,     // The recipient address which redeemed the SetTokens
-        address indexed _setToken,    // The redeemed SetToken
-        address indexed _outputToken,   // The address of output asset(ERC20/ETH) received by the recipient
-        uint256 _amountSetRedeemed,     // The amount of SetTokens redeemed for output tokens
-        uint256 _amountOutputToken      // The amount of output tokens received by the recipient
+    event FlashRedeem( // The recipient address which redeemed the SetTokens
+        // The redeemed SetToken
+        // The address of output asset(ERC20/ETH) received by the recipient
+        // The amount of SetTokens redeemed for output tokens
+        // The amount of output tokens received by the recipient
+        address indexed _recipient,
+        address indexed _setToken,
+        address indexed _outputToken,
+        uint256 _amountSetRedeemed,
+        uint256 _amountOutputToken
     );
 
     /* ============ Functions ============ */
 
-    function getLeveragedTokenData(
-        address _setToken,
-        uint256 _setAmount,
-        bool _isIssuance
-    ) external view returns (LeveragedTokenData memory);
+    function getLeveragedTokenData(address _setToken, uint256 _setAmount, bool _isIssuance)
+        external
+        view
+        returns (LeveragedTokenData memory);
 
     function approveToken(address _token) external;
 
@@ -101,4 +108,4 @@ interface IFlashMintDexV5 {
     function approveTokens(address[] memory _tokens) external;
 
     function approveSetToken(address _setToken) external;
-} 
+}
