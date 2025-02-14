@@ -40,6 +40,8 @@ contract FlashMintExecutorTest is Test, PermitSignature, DeployPermit2 {
     MockFlashMint mockFlashMint;
 
     FlashMintExecutor flashMintExecutor;
+    
+    IFlashMintDexV5.SwapData emptySwapData;
 
     uint256 constant ONE = 10 ** 18;
     // Represents a 0.3% fee, but setting this doesn't matter
@@ -75,11 +77,73 @@ contract FlashMintExecutorTest is Test, PermitSignature, DeployPermit2 {
         reactor = new DutchOrderReactor(permit2, PROTOCOL_FEE_OWNER);
 
         flashMintExecutor = new FlashMintExecutor(reactor, owner);
+
+        emptySwapData = IFlashMintDexV5.SwapData({
+            path: new address[](0),
+            fees: new uint24[](0),
+            tickSpacing: new int24[](0),
+            pool: address(0),
+            poolIds: new bytes32[](0),
+            exchange: 0
+        });
     }
 
     function testConstructor() public {
         assertEq(address(flashMintExecutor.reactor()), address(reactor), "Incorrect reactor address");
         assertEq(flashMintExecutor.owner(), owner, "Incorrect owner address");
+    }
+
+    function testReactorCallbackIssuance() public {
+        vm.prank(owner);
+        flashMintExecutor.addFlashMintToken(address(mockSetToken), mockFlashMint);
+
+        uint256 issueAmount = 1 ether;
+
+        OutputToken[] memory outputs = new OutputToken[](1);
+        outputs[0].token = address(mockSetToken);
+        outputs[0].amount = issueAmount;
+        outputs[0].recipient = swapper;
+
+        address setToken = address(mockSetToken);
+        uint256 setAmount = issueAmount;
+        address inputOutputToken = address(underlyingToken);
+        uint256 inputOutputTokenAmount = issueAmount * underlyingUnit / ONE;
+
+        IFlashMintDexV5.SwapData memory swapDataCollateral = emptySwapData;
+        IFlashMintDexV5.SwapData memory swapDataInputOutputToken = emptySwapData;
+
+        bytes memory callbackData = abi.encode(
+            setToken,
+            setAmount,
+            inputOutputToken,
+            inputOutputTokenAmount,
+            swapDataCollateral,
+            swapDataInputOutputToken,
+            true
+        );
+
+        ResolvedOrder[] memory resolvedOrders = new ResolvedOrder[](1);
+        bytes memory sig = hex"1234";
+        resolvedOrders[0] = ResolvedOrder(
+            OrderInfoBuilder.init(address(reactor)).withSwapper(swapper).withDeadline(block.timestamp + 100),
+            InputToken(underlyingToken, inputOutputTokenAmount, inputOutputTokenAmount),
+            outputs,
+            sig,
+            keccak256(abi.encode(1))
+        );
+
+        underlyingToken.mint(address(swapper), inputOutputTokenAmount);
+        assertEq(underlyingToken.balanceOf(address(swapper)), inputOutputTokenAmount);
+        assertEq(underlyingToken.balanceOf(address(mockSetToken)), 0);
+        assertEq(mockSetToken.balanceOf(address(swapper)), 0);
+
+        vm.prank(address(reactor));
+        flashMintExecutor.reactorCallback(resolvedOrders, callbackData);
+
+        assertEq(underlyingToken.balanceOf(address(swapper)), 0);
+        assertEq(underlyingToken.balanceOf(address(mockSetToken)), inputOutputTokenAmount);
+        assertEq(mockSetToken.balanceOf(address(swapper)), issueAmount);
+        assertEq(mockSetToken.allowance(address(mockFlashMint), address(reactor)), type(uint256).max);
     }
 
     function testAddFlashMintToken() public {

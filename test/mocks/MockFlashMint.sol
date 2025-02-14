@@ -29,7 +29,7 @@ contract MockFlashMint is IFlashMintDexV5 {
         SwapData memory
     ) public returns (uint256) {
         MockSetToken setToken = MockSetToken(_setToken);
-        uint256 requiredAmount = _setAmount * setToken.underlyingUnit();
+        uint256 requiredAmount = _setAmount * setToken.underlyingUnit() / 1 ether;
         require(requiredAmount <= _maxAmountInputToken, "Exceeds max input");
         return requiredAmount;
     }
@@ -41,7 +41,7 @@ contract MockFlashMint is IFlashMintDexV5 {
         SwapData memory
     ) public returns (uint256) {
         MockSetToken setToken = MockSetToken(_setToken);
-        uint256 outputAmount = _setAmount * setToken.underlyingUnit();
+        uint256 outputAmount = _setAmount * 1 ether / setToken.underlyingUnit();
         
         return outputAmount;
     }
