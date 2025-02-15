@@ -97,7 +97,8 @@ contract MockFlashMint is IFlashMintDexV5 {
         );
 
         MockSetToken setToken = MockSetToken(_setToken);
-        ERC20(setToken.underlyingToken()).transferFrom(msg.sender, address(setToken), requiredAmount);
+        ERC20(setToken.underlyingToken()).transferFrom(msg.sender, address(this), requiredAmount);
+        ERC20(setToken.underlyingToken()).approve(address(setToken), requiredAmount);
         setToken.issue(msg.sender, _setAmount);
         
         emit FlashMint(

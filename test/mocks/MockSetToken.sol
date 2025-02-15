@@ -19,7 +19,7 @@ contract MockSetToken is MockERC20 {
     }
 
     function issue(address _recipient, uint256 _amount) external {
-        uint256 underlyingAmount = _amount * underlyingUnit;
+        uint256 underlyingAmount = _amount * underlyingUnit / 1e18;
         underlyingToken.transferFrom(msg.sender, address(this), underlyingAmount);
         _mint(_recipient, _amount);
     }

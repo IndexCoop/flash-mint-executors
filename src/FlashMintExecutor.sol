@@ -162,6 +162,7 @@ contract FlashMintExecutor is IReactorCallback, Owned {
                 swapDataInputOutputToken
             );
         }
+        IERC20(setToken).transfer(msg.sender, setAmount);
     }
 
     function getFlashMintContract(address setToken) internal view returns (IFlashMintDexV5) {
