@@ -11,8 +11,19 @@ import {OrderInfoBuilder} from "uniswapx/test/util/OrderInfoBuilder.sol";
 import {OutputsBuilder} from "uniswapx/test/util/OutputsBuilder.sol";
 import {PermitSignature} from "uniswapx/test/util/PermitSignature.sol";
 import {ISwapRouter02, ExactInputParams} from "uniswapx/src/external/ISwapRouter02.sol";
-import {V2DutchOrder, V2DutchOrderLib} from "uniswapx/src/lib/V2DutchOrderLib.sol";
+import {DutchOrder} from "uniswapx/src/lib/DutchOrderLib.sol";
+import {
+    V2DutchOrder,
+    V2DutchOrderLib,
+    CosignerData,
+    V2DutchOrderReactor,
+    ResolvedOrder,
+    DutchOutput,
+    DutchInput,
+    BaseReactor
+} from "uniswapx/src/reactors/V2DutchOrderReactor.sol";
 import {IReactor} from "uniswapx/src/interfaces/IReactor.sol";
+import {ArrayBuilder} from "uniswapx/test/util/ArrayBuilder.sol";
 
 import {IFlashMintDexV5} from "../src/interfaces/IFlashMintDexV5.sol";
 import {FlashMintExecutor} from "../src/FlashMintExecutor.sol";
@@ -31,9 +42,9 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
 
     address underlyingTokenWhale = 0x8EB8a3b98659Cce290402893d0123abb75E3ab28;
     uint256  underlyingUnit;
-    Vm.Wallet fillerWallet;
-    address filler;
-    uint256 fillerPrivateKey;
+    Vm.Wallet cosignerWallet;
+    address cosigner;
+    uint256 cosignerPrivateKey;
     uint256 swapperPrivateKey;
     address swapper;
     IReactor v2DutchOrderReactor = IReactor(0x00000011F84B9aa48e5f8aA8B9897600006289Be);
@@ -57,7 +68,7 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
     function setUp() public {
         vm.createSelectFork("mainnet", testBlock);
 
-        fillerWallet = vm.createWallet("filler");
+        cosignerWallet = vm.createWallet("cosigner");
 
         owner = msg.sender;
         underlyingUnit = 2 ether;
@@ -66,8 +77,8 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
         underlyingToken.transfer(address(this), 100 ether);
         vm.stopPrank();
 
-        filler = fillerWallet.addr;
-        fillerPrivateKey = fillerWallet.privateKey;
+        cosigner = cosignerWallet.addr;
+        cosignerPrivateKey = cosignerWallet.privateKey;
         swapperPrivateKey = 0x12341235;
         swapper = vm.addr(swapperPrivateKey);
 
@@ -82,39 +93,96 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
         });
     }
 
-    function createAndSignOrder(V2DutchOrder memory request)
-        public
-        virtual
-        returns (SignedOrder memory signedOrder, bytes32 orderHash)
-    {
-
-        request.cosigner = filler;
-        request.info.reactor = v2DutchOrderReactor;
-        bytes32 signatureData = keccak256(abi.encodePacked(request.hash(), abi.encode(request.cosignerData)));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(fillerWallet, signatureData);
-        bytes memory signature = abi.encodePacked(abi.encode(r, s), v);
-        request.cosignature = signature;
-        _validateOrder(request.hash(), request);
-        return (SignedOrder({
-            order: abi.encode(request),
-            sig: signature
-        }), request.hash());
+    function cosignOrder(bytes32 orderHash, CosignerData memory cosignerData) private view returns (bytes memory sig) {
+        bytes32 msgHash = keccak256(abi.encodePacked(orderHash, abi.encode(cosignerData)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(cosignerPrivateKey, msgHash);
+        sig = bytes.concat(r, s, bytes1(v));
     }
 
-    /// @dev Create many signed orders and return
-    /// @param requests Array of orders to sign
-    function createAndSignBatchOrders(V2DutchOrder[] memory requests)
-        public
-        returns (SignedOrder[] memory signedOrders, bytes32[] memory orderHashes)
-    {
-        signedOrders = new SignedOrder[](requests.length);
-        orderHashes = new bytes32[](requests.length);
-        for (uint256 i = 0; i < requests.length; i++) {
-            (SignedOrder memory signed, bytes32 hash) = createAndSignOrder(requests[i]);
-            signedOrders[i] = signed;
-            orderHashes[i] = hash;
+    function generateSignedOrders(V2DutchOrder[] memory orders) private view returns (SignedOrder[] memory result) {
+        result = new SignedOrder[](orders.length);
+        for (uint256 i = 0; i < orders.length; i++) {
+            bytes memory sig = signOrder(swapperPrivateKey, address(permit2), orders[i]);
+            result[i] = SignedOrder(abi.encode(orders[i]), sig);
         }
-        return (signedOrders, orderHashes);
+    }
+
+    /// @dev Create and return a basic single Dutch limit order along with its signature, orderHash, and orderInfo
+    function createAndSignOrder(ResolvedOrder memory request)
+        public
+        view
+        returns (SignedOrder memory signedOrder, bytes32 orderHash)
+    {
+        DutchOutput[] memory outputs = new DutchOutput[](request.outputs.length);
+        for (uint256 i = 0; i < request.outputs.length; i++) {
+            OutputToken memory output = request.outputs[i];
+            outputs[i] = DutchOutput({
+                token: output.token,
+                startAmount: output.amount,
+                endAmount: output.amount,
+                recipient: output.recipient
+            });
+        }
+
+        uint256[] memory outputAmounts = new uint256[](request.outputs.length);
+        for (uint256 i = 0; i < request.outputs.length; i++) {
+            outputAmounts[i] = 0;
+        }
+
+        CosignerData memory cosignerData = CosignerData({
+            decayStartTime: block.timestamp,
+            decayEndTime: request.info.deadline,
+            exclusiveFiller: address(0),
+            exclusivityOverrideBps: 0,
+            inputAmount: 0,
+            outputAmounts: outputAmounts
+        });
+
+        V2DutchOrder memory order = V2DutchOrder({
+            info: request.info,
+            cosigner: vm.addr(cosignerPrivateKey),
+            baseInput: DutchInput(request.input.token, request.input.amount, request.input.amount),
+            baseOutputs: outputs,
+            cosignerData: cosignerData,
+            cosignature: bytes("")
+        });
+        orderHash = order.hash();
+        order.cosignature = cosignOrder(orderHash, cosignerData);
+        return (SignedOrder(abi.encode(order), signOrder(swapperPrivateKey, address(permit2), order)), orderHash);
+    }
+
+    /// @dev Create a signed order and return the order and orderHash
+    /// @param request Order to sign
+    function createAndSignDutchOrder(DutchOrder memory request)
+        public
+        view
+        returns (SignedOrder memory signedOrder, bytes32 orderHash)
+    {
+        uint256[] memory outputAmounts = new uint256[](request.outputs.length);
+        for (uint256 i = 0; i < request.outputs.length; i++) {
+            outputAmounts[i] = 0;
+        }
+        CosignerData memory cosignerData = CosignerData({
+            decayStartTime: request.decayStartTime,
+            decayEndTime: request.decayEndTime,
+            exclusiveFiller: address(0),
+            exclusivityOverrideBps: 0,
+            inputAmount: 0,
+            outputAmounts: outputAmounts
+        });
+
+        V2DutchOrder memory order = V2DutchOrder({
+            info: request.info,
+            cosigner: vm.addr(cosignerPrivateKey),
+            baseInput: request.input,
+            baseOutputs: request.outputs,
+            cosignerData: cosignerData,
+            cosignature: bytes("")
+        });
+
+        orderHash = order.hash();
+        order.cosignature = cosignOrder(orderHash, cosignerData);
+        return (SignedOrder(abi.encode(order), signOrder(swapperPrivateKey, address(permit2), order)), orderHash);
     }
 
     function testReactorCallbackIssuance() public {
@@ -146,24 +214,29 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
             true
         );
 
-        V2DutchOrder[] memory resolvedOrders = new V2DutchOrder[](1);
-        // resolvedOrders[0] = V2DutchOrder(
-        //     OrderInfoBuilder.init(address(v2DutchOrderReactor)).withSwapper(swapper).withDeadline(block.timestamp + 100),
-        //     InputToken(underlyingToken, inputOutputTokenAmount, inputOutputTokenAmount),
-        //     outputs,
-        //     sig,
-        //     keccak256(abi.encode(1))
-        // );
+        CosignerData memory cosignerData = CosignerData({
+            decayStartTime: block.timestamp,
+            decayEndTime: block.timestamp + 100,
+            exclusiveFiller: address(0),
+            exclusivityOverrideBps: 0,
+            inputAmount: 1 ether,
+            outputAmounts: ArrayBuilder.fill(1, 1 ether)
+        });
 
-
-        //vm.prank(address(swapper));
-        // Note: In reality the reactor will send the tokens ot the executor prior to calling the callback
-        underlyingToken.transfer(address(flashMintExecutor), inputOutputTokenAmount);
-
-        (SignedOrder[] memory signedOrders, bytes32[] memory orderHashes) = createAndSignBatchOrders(resolvedOrders);
-
-        flashMintExecutor.executeBatch(signedOrders, callbackData);
-
+        ERC20 tokenIn = underlyingToken;
+        ERC20 tokenOut = ERC20(address(eth2x));
+        V2DutchOrder memory order = V2DutchOrder({
+            info: OrderInfoBuilder.init(address(v2DutchOrderReactor)).withSwapper(swapper),
+            cosigner: cosigner,
+            baseInput: DutchInput(tokenIn, 1 ether, 1 ether),
+            baseOutputs: OutputsBuilder.singleDutch(address(tokenOut), 1 ether, 1 ether, swapper),
+            cosignerData: cosignerData,
+            cosignature: bytes("")
+        });
+        order.cosignature = cosignOrder(order.hash(), cosignerData);
+        SignedOrder memory signedOrder =
+            SignedOrder(abi.encode(order), signOrder(swapperPrivateKey, address(permit2), order));
+        flashMintExecutor.execute(signedOrder, callbackData);
     }
 
     /// @notice validate the dutch order fields
