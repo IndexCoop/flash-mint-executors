@@ -89,6 +89,7 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
     {
 
         request.cosigner = filler;
+        request.info.reactor = v2DutchOrderReactor;
         bytes32 signatureData = keccak256(abi.encodePacked(request.hash(), abi.encode(request.cosignerData)));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(fillerWallet, signatureData);
         bytes memory signature = abi.encodePacked(abi.encode(r, s), v);
