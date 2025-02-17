@@ -73,15 +73,19 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
         owner = msg.sender;
         underlyingUnit = 2 ether;
 
-        vm.startPrank(underlyingTokenWhale);
-        underlyingToken.transfer(address(this), 100 ether);
-        vm.stopPrank();
 
         cosigner = cosignerWallet.addr;
         cosignerPrivateKey = cosignerWallet.privateKey;
+
         swapperPrivateKey = 0x12341235;
         swapper = vm.addr(swapperPrivateKey);
+        vm.startPrank(swapper);
+        underlyingToken.approve(address(permit2), 100 ether);
+        vm.stopPrank();
 
+        vm.startPrank(underlyingTokenWhale);
+        underlyingToken.transfer(swapper, 100 ether);
+        vm.stopPrank();
 
         flashMintExecutor = new FlashMintExecutor(v2DutchOrderReactor, owner);
         
