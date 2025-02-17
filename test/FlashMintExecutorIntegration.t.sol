@@ -31,9 +31,10 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
 
     address underlyingTokenWhale = 0x8EB8a3b98659Cce290402893d0123abb75E3ab28;
     uint256  underlyingUnit;
+    Vm.Wallet fillerWallet;
+    address filler;
     uint256 fillerPrivateKey;
     uint256 swapperPrivateKey;
-    address filler;
     address swapper;
     IReactor v2DutchOrderReactor = IReactor(0x00000011F84B9aa48e5f8aA8B9897600006289Be);
     IPermit2 permit2 = IPermit2(0x000000000022D473030F116dDEE9F6B43aC78BA3);
@@ -56,6 +57,8 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
     function setUp() public {
         vm.createSelectFork("mainnet", testBlock);
 
+        fillerWallet = vm.createWallet("filler");
+
         owner = msg.sender;
         underlyingUnit = 2 ether;
 
@@ -63,10 +66,8 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
         underlyingToken.transfer(address(this), 100 ether);
         vm.stopPrank();
 
-        // Mock filler and swapper
-        fillerPrivateKey = 0x12341235;
-        filler = vm.addr(fillerPrivateKey);
-        console.log("filler", filler);
+        filler = fillerWallet.addr;
+        fillerPrivateKey = fillerWallet.privateKey;
         swapperPrivateKey = 0x12341235;
         swapper = vm.addr(swapperPrivateKey);
 
@@ -87,10 +88,12 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
         returns (SignedOrder memory signedOrder, bytes32 orderHash)
     {
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(fillerPrivateKey, request.hash());
-        bytes memory signature = abi.encodePacked(r, s, v);
-        request.cosignature = signature;
         request.cosigner = filler;
+        bytes32 signatureData = keccak256(abi.encodePacked(request.hash(), abi.encode(request.cosignerData)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(fillerWallet, signatureData);
+        bytes memory signature = abi.encodePacked(abi.encode(r, s), v);
+        request.cosignature = signature;
+        _validateOrder(request.hash(), request);
         return (SignedOrder({
             order: abi.encode(request),
             sig: signature
@@ -160,6 +163,18 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
 
         flashMintExecutor.executeBatch(signedOrders, callbackData);
 
+    }
+
+    /// @notice validate the dutch order fields
+    /// - deadline must be greater than or equal to decayEndTime
+    /// - decayEndTime must be greater than decayStartTime
+    /// - if there's input decay, outputs must not decay
+    /// @dev Throws if the order is invalid
+    function _validateOrder(bytes32 orderHash, V2DutchOrder memory order) internal pure {
+        (bytes32 r, bytes32 s) = abi.decode(order.cosignature, (bytes32, bytes32));
+        uint8 v = uint8(order.cosignature[64]);
+        // cosigner signs over (orderHash || cosignerData)
+        address signer = ecrecover(keccak256(abi.encodePacked(orderHash, abi.encode(order.cosignerData))), v, r, s);
     }
 
 
