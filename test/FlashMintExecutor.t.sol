@@ -49,7 +49,7 @@ contract FlashMintExecutorTest is Test, PermitSignature, DeployPermit2 {
     address constant PROTOCOL_FEE_OWNER = address(80085);
 
     event FlashMintTokenAdded(address indexed token, address indexed flashMintContract);
-    event FlashMintTokenRemoved(address indexed token);
+    event FlashMintTokenRemoved(address indexed token, address indexed flashMintContract);
 
     // to test sweeping ETH
     receive() external payable {}
@@ -95,7 +95,7 @@ contract FlashMintExecutorTest is Test, PermitSignature, DeployPermit2 {
 
     function testReactorCallbackIssuance() public {
         vm.prank(owner);
-        flashMintExecutor.addFlashMintToken(address(mockSetToken), mockFlashMint);
+        flashMintExecutor.addFlashMintToken(address(mockSetToken), address(mockFlashMint));
 
         uint256 issueAmount = 1 ether;
 
@@ -111,15 +111,23 @@ contract FlashMintExecutorTest is Test, PermitSignature, DeployPermit2 {
 
         IFlashMintDexV5.SwapData memory swapDataCollateral = emptySwapData;
         IFlashMintDexV5.SwapData memory swapDataInputOutputToken = emptySwapData;
-
-        bytes memory callbackData = abi.encode(
+        
+        bytes memory flashMintCallData = abi.encodeWithSelector(
+            IFlashMintDexV5.issueExactSetFromERC20.selector,
             setToken,
             setAmount,
             inputOutputToken,
             inputOutputTokenAmount,
             swapDataCollateral,
-            swapDataInputOutputToken,
-            true
+            swapDataInputOutputToken
+        );
+
+        bytes memory callbackData = abi.encode(
+            setToken,
+            address(mockFlashMint),
+            inputOutputToken,
+            true,
+            flashMintCallData
         );
 
         ResolvedOrder[] memory resolvedOrders = new ResolvedOrder[](1);
@@ -157,77 +165,45 @@ contract FlashMintExecutorTest is Test, PermitSignature, DeployPermit2 {
         emit FlashMintTokenAdded(address(mockSetToken), address(mockFlashMint));
 
         vm.prank(owner);
-        flashMintExecutor.addFlashMintToken(address(mockSetToken), mockFlashMint);
-
-        assertTrue(flashMintExecutor.flashMintEnabled(address(mockSetToken)), "Token should be enabled");
-        assertEq(
-            address(flashMintExecutor.flashMintForToken(address(mockSetToken))), 
-            address(mockFlashMint), 
-            "Incorrect flash mint contract"
-        );
+        flashMintExecutor.addFlashMintToken(address(mockSetToken), address(mockFlashMint));
+        assertTrue(flashMintExecutor.flashMintEnabled(address(mockSetToken), address(mockFlashMint)), "Token should be enabled");
     }
 
     function testCannotAddFlashMintTokenWithZeroAddresses() public {
         vm.expectRevert("Invalid token");
         vm.prank(owner);
-        flashMintExecutor.addFlashMintToken(address(0), IFlashMintDexV5(mockFlashMint));
+        flashMintExecutor.addFlashMintToken(address(0), address(mockFlashMint));
 
         vm.expectRevert("Invalid FlashMint contract");
         vm.prank(owner);
-        flashMintExecutor.addFlashMintToken(address(mockSetToken), IFlashMintDexV5(address(0)));
+        flashMintExecutor.addFlashMintToken(address(mockSetToken), address(0));
     }
 
     function testCannotAddFlashMintTokenIfNotOwner() public {
         vm.prank(nonOwner);
         vm.expectRevert("UNAUTHORIZED");
-        flashMintExecutor.addFlashMintToken(address(mockSetToken), mockFlashMint);
+        flashMintExecutor.addFlashMintToken(address(mockSetToken), address(mockFlashMint));
     }
 
     function testRemoveFlashMintToken() public {
         vm.prank(owner);
-        flashMintExecutor.addFlashMintToken(address(mockSetToken), mockFlashMint);
+        flashMintExecutor.addFlashMintToken(address(mockSetToken), address(mockFlashMint));
 
-        vm.expectEmit(true, false, false, true);
-        emit FlashMintTokenRemoved(address(mockSetToken));
+        vm.expectEmit(true, true, false, true);
+        emit FlashMintTokenRemoved(address(mockSetToken), address(mockFlashMint));
 
         vm.prank(owner);
-        flashMintExecutor.removeFlashMintToken(address(mockSetToken));
+        flashMintExecutor.removeFlashMintToken(address(mockSetToken), address(mockFlashMint));
 
-        assertFalse(flashMintExecutor.flashMintEnabled(address(mockSetToken)), "Token should be disabled");
-        assertEq(
-            address(flashMintExecutor.flashMintForToken(address(mockSetToken))), 
-            address(0), 
-            "Flash mint contract should be removed"
-        );
+        assertFalse(flashMintExecutor.flashMintEnabled(address(mockSetToken), address(mockFlashMint)), "Token should be disabled");
     }
 
     function testCannotRemoveFlashMintTokenIfNotOwner() public {
         vm.prank(owner);
-        flashMintExecutor.addFlashMintToken(address(mockSetToken), mockFlashMint);
+        flashMintExecutor.addFlashMintToken(address(mockSetToken), address(mockFlashMint));
 
         vm.prank(nonOwner);
         vm.expectRevert("UNAUTHORIZED");
-        flashMintExecutor.removeFlashMintToken(address(mockSetToken));
+        flashMintExecutor.removeFlashMintToken(address(mockSetToken), address(mockFlashMint));
     }
-
-    function testUpdateFlashMintToken() public {
-        address newMockFlashMint = address(0x99);
-
-        vm.prank(owner);
-        flashMintExecutor.addFlashMintToken(address(mockSetToken), mockFlashMint);
-
-        vm.expectEmit(true, true, false, false);
-        emit FlashMintTokenAdded(address(mockSetToken), newMockFlashMint);
-
-        vm.prank(owner);
-        flashMintExecutor.addFlashMintToken(address(mockSetToken), IFlashMintDexV5(newMockFlashMint));
-
-        assertTrue(flashMintExecutor.flashMintEnabled(address(mockSetToken)), "Token should still be enabled");
-        assertEq(
-            address(flashMintExecutor.flashMintForToken(address(mockSetToken))), 
-            newMockFlashMint, 
-            "Flash mint contract should be updated"
-        );
-    }
-
 }

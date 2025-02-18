@@ -38,17 +38,15 @@ contract FlashMintExecutor is IReactorCallback, Owned {
     using SafeTransferLib for ERC20;
 
     event FlashMintTokenAdded(address indexed token, address indexed flashMintContract);
-    event FlashMintTokenRemoved(address indexed token);
+    event FlashMintTokenRemoved(address indexed token, address indexed flashMintContract);
 
     /// @notice Reverts if reactorCallback is called by an address other than the expected reactor.
     error MsgSenderNotReactor();
 
     IReactor public immutable reactor;
 
-    // Mapping of enabled FlashMint tokens (typically SetTokens) to a boolean flag.
-    mapping(address => bool) public flashMintEnabled;
-    // Mapping from an enabled FlashMint token (SetToken) to its FlashMint contract.
-    mapping(address => IFlashMintDexV5) public flashMintForToken;
+    // Mapping of enabled set tokens and flashmint contract combinations
+    mapping(address => mapping(address => bool)) public flashMintEnabled;
 
     modifier onlyReactor() {
         if (msg.sender != address(reactor)) {
@@ -64,20 +62,18 @@ contract FlashMintExecutor is IReactorCallback, Owned {
     /// @notice Enables a token and registers its FlashMint contract.
     /// @param token The token (e.g. a SetToken) to enable.
     /// @param flashMintContract The FlashMint contract to use for this token.
-    function addFlashMintToken(address token, IFlashMintDexV5 flashMintContract) external onlyOwner {
+    function addFlashMintToken(address token, address flashMintContract) external onlyOwner {
         require(token != address(0), "Invalid token");
-        require(address(flashMintContract) != address(0), "Invalid FlashMint contract");
-        flashMintEnabled[token] = true;
-        flashMintForToken[token] = flashMintContract;
-        emit FlashMintTokenAdded(token, address(flashMintContract));
+        require(flashMintContract != address(0), "Invalid FlashMint contract");
+        flashMintEnabled[token][flashMintContract] = true;
+        emit FlashMintTokenAdded(token, flashMintContract);
     }
 
     /// @notice Removes a token from the enabled list.
     /// @param token The token to remove.
-    function removeFlashMintToken(address token) external onlyOwner {
-        flashMintEnabled[token] = false;
-        delete flashMintForToken[token];
-        emit FlashMintTokenRemoved(token);
+    function removeFlashMintToken(address token, address flashMintContract) external onlyOwner {
+        flashMintEnabled[token][flashMintContract] = false;
+        emit FlashMintTokenRemoved(token, flashMintContract);
     }
 
     /// @notice Withdraws a token from the contract.
@@ -112,62 +108,43 @@ contract FlashMintExecutor is IReactorCallback, Owned {
     function reactorCallback(ResolvedOrder[] calldata, bytes calldata callbackData) external override onlyReactor {
         (
             address setToken,
-            uint256 setAmount,
+            address flashMintContract,
             address inputOutputToken,
-            uint256 inputOutputTokenAmount,
-            IFlashMintDexV5.SwapData memory swapDataCollateral,
-            IFlashMintDexV5.SwapData memory swapDataInputOutputToken,
-            bool isIssuance
+            bool isIssuance,
+            bytes memory flashMintCalldata
         ) = abi.decode(
             callbackData,
             (
                 address,
-                uint256,
                 address,
-                uint256,
-                IFlashMintDexV5.SwapData,
-                IFlashMintDexV5.SwapData,
-                bool
+                address,
+                bool,
+                bytes
             )
         );
 
-        IFlashMintDexV5 flashMintContract = getFlashMintContract(setToken);
+        // TODO: Review why unchecked
         unchecked {
             (address setTokenApproveTarget, address inputOutputTokenApproveTarget) = isIssuance 
-                ? (address(reactor), address(flashMintContract)) 
-                : (address(flashMintContract), address(reactor));
+                ? (address(reactor), flashMintContract) 
+                : (flashMintContract, address(reactor));
 
             ERC20(setToken).safeApprove(setTokenApproveTarget, type(uint256).max);
             ERC20(inputOutputToken).safeApprove(inputOutputTokenApproveTarget, type(uint256).max);
         }
 
+        require(flashMintEnabled[setToken][flashMintContract], "FlashMint not enabled for set token");
         if (isIssuance) {
-            require(flashMintEnabled[setToken], "FlashMint not enabled for issuance");
-            flashMintContract.issueExactSetFromERC20(
-                setToken,
-                setAmount,
-                inputOutputToken,
-                inputOutputTokenAmount,
-                swapDataCollateral,
-                swapDataInputOutputToken
-            );
+            uint256 setBalanceBefore = IERC20(setToken).balanceOf(address(this));
+            flashMintContract.call(flashMintCalldata);
+            uint256 setAmount = IERC20(setToken).balanceOf(address(this)) - setBalanceBefore;
+            IERC20(setToken).transfer(msg.sender, setAmount);
         } else {
-            require(flashMintEnabled[setToken], "FlashMint not enabled for redemption");
-            flashMintContract.redeemExactSetForERC20(
-                setToken,
-                setAmount,
-                inputOutputToken,
-                inputOutputTokenAmount,
-                swapDataCollateral,
-                swapDataInputOutputToken
-            );
+            uint256 outputTokenBalanceBefore = IERC20(inputOutputToken).balanceOf(address(this));
+            // Note: Might need to add native eth support here
+            flashMintContract.call(flashMintCalldata);
+            uint256 outputTokenAmount = IERC20(inputOutputToken).balanceOf(address(this)) - outputTokenBalanceBefore;
+            IERC20(inputOutputToken).transfer(msg.sender, outputTokenAmount);
         }
-        IERC20(setToken).transfer(msg.sender, setAmount);
-    }
-
-    function getFlashMintContract(address setToken) internal view returns (IFlashMintDexV5) {
-        IFlashMintDexV5 flashMintContract = flashMintForToken[setToken];
-        require(address(flashMintContract) != address(0), "No flashMint contract for this token");
-        return flashMintContract;
     }
 }

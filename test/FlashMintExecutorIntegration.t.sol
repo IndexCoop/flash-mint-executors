@@ -191,7 +191,7 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
 
     function testReactorCallbackIssuance() public {
         vm.prank(owner);
-        flashMintExecutor.addFlashMintToken(address(eth2x), IFlashMintDexV5(address(flashMintLeveraged)));
+        flashMintExecutor.addFlashMintToken(address(eth2x), address(flashMintLeveraged));
 
         uint256 issueAmount = 1 ether;
 
