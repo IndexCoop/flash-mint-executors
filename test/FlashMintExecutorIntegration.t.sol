@@ -340,6 +340,7 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
         order.cosignature = cosignOrder(order.hash(), cosignerData);
         SignedOrder memory signedOrder =
             SignedOrder(abi.encode(order), signOrder(swapperPrivateKey, address(permit2), order));
+
         flashMintExecutor.execute(signedOrder, callbackData);
     }
 

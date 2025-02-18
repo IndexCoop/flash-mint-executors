@@ -153,9 +153,8 @@ contract FlashMintExecutorTest is Test, PermitSignature, DeployPermit2 {
 
         assertEq(underlyingToken.balanceOf(address(swapper)), 0);
         assertEq(underlyingToken.balanceOf(address(mockSetToken)), inputOutputTokenAmount);
-        // According to my understanding after the callback the output tokens should be in the reactors balance which then distributes it to the recipients
-        // TODO: Verify that this is correct
-        assertEq(mockSetToken.balanceOf(address(reactor)), issueAmount);
+        // Note: the output token is expected to be approved to the reactor which will then pull it out of the executor contract and send to the swapper
+        assertEq(mockSetToken.allowance(address(flashMintExecutor), address(reactor)), issueAmount);
         // Note: Removed this assertion as it doesn't seem to be necessary / part of the interface
         // assertEq(mockSetToken.allowance(address(mockFlashMint), address(reactor)), type(uint256).max);
     }
