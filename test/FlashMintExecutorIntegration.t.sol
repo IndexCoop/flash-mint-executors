@@ -36,7 +36,7 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
     using OrderInfoBuilder for OrderInfo;
     using V2DutchOrderLib for V2DutchOrder;
 
-    uint256 testBlock = 19994792;
+    uint256 testBlock = 21870368;
     address public owner;
     address public nonOwner;
 
@@ -52,6 +52,7 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
     IFlashMintLeveraged flashMintLeveraged = IFlashMintLeveraged(payable(0x45c00508C14601fd1C1e296eB3C0e3eEEdCa45D0));
     ISetToken eth2x = ISetToken(0x65c4C0517025Ec0843C9146aF266A2C5a2D148A2);
     ERC20 underlyingToken = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2); // WETH
+    ERC20 usdc = ERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
 
     FlashMintExecutor flashMintExecutor;
     
@@ -203,19 +204,39 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
         address setToken = address(eth2x);
         uint256 setAmount = issueAmount;
         address inputOutputToken = address(underlyingToken);
-        uint256 inputOutputTokenAmount = issueAmount * underlyingUnit / ONE;
+        uint256 inputOutputTokenAmount = 0.015 ether;
 
-        DEXAdapter.SwapData memory swapDataCollateral = emptySwapData;
+        address[] memory path = new address[](2);
+        path[0] = address(usdc);
+        path[1] = address(underlyingToken);
+
+        uint24[] memory fees = new uint24[](1);
+        fees[0] = 500;
+
+        DEXAdapter.SwapData memory swapDataDebtToCollateral = DEXAdapter.SwapData({ 
+            path: path,
+            fees: fees,
+            pool: address(0),
+            exchange: 3
+        });
         DEXAdapter.SwapData memory swapDataInputOutputToken = emptySwapData;
 
-        bytes memory callbackData = abi.encode(
+        bytes memory flashMintCallData = abi.encodeWithSelector(
+            IFlashMintLeveraged.issueExactSetFromERC20.selector,
             setToken,
             setAmount,
             inputOutputToken,
             inputOutputTokenAmount,
-            swapDataCollateral,
-            swapDataInputOutputToken,
-            true
+            swapDataDebtToCollateral,
+            swapDataInputOutputToken
+        );
+
+        bytes memory callbackData = abi.encode(
+            setToken,
+            address(flashMintLeveraged),
+            inputOutputToken,
+            true,
+            flashMintCallData
         );
 
         CosignerData memory cosignerData = CosignerData({

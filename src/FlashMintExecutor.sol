@@ -136,15 +136,16 @@ contract FlashMintExecutor is IReactorCallback, Owned {
         require(flashMintEnabled[setToken][flashMintContract], "FlashMint not enabled for set token");
         if (isIssuance) {
             uint256 setBalanceBefore = IERC20(setToken).balanceOf(address(this));
-            flashMintContract.call(flashMintCalldata);
+            (bool success, bytes memory data) = flashMintContract.call(flashMintCalldata);
+            require(success, "FlashMint issuance failed");
             uint256 setAmount = IERC20(setToken).balanceOf(address(this)) - setBalanceBefore;
-            IERC20(setToken).transfer(msg.sender, setAmount);
+            IERC20(setToken).approve(msg.sender, setAmount);
         } else {
             uint256 outputTokenBalanceBefore = IERC20(inputOutputToken).balanceOf(address(this));
-            // Note: Might need to add native eth support here
-            flashMintContract.call(flashMintCalldata);
+            (bool success, bytes memory data) = flashMintContract.call(flashMintCalldata);
+            require(success, "FlashMint redemption failed");
             uint256 outputTokenAmount = IERC20(inputOutputToken).balanceOf(address(this)) - outputTokenBalanceBefore;
-            IERC20(inputOutputToken).transfer(msg.sender, outputTokenAmount);
+            IERC20(inputOutputToken).approve(msg.sender, outputTokenAmount);
         }
     }
 }
