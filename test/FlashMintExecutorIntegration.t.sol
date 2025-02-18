@@ -82,6 +82,7 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
         swapper = vm.addr(swapperPrivateKey);
         vm.startPrank(swapper);
         underlyingToken.approve(address(permit2), 100 ether);
+        eth2x.approve(address(permit2), 100 ether);
         vm.stopPrank();
 
         vm.startPrank(underlyingTokenWhale);
@@ -190,7 +191,7 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
         return (SignedOrder(abi.encode(order), signOrder(swapperPrivateKey, address(permit2), order)), orderHash);
     }
 
-    function testReactorCallbackIssuance() public {
+    function testExecuteIssuance() public {
         vm.prank(owner);
         flashMintExecutor.addFlashMintToken(address(eth2x), address(flashMintLeveraged));
 
@@ -255,6 +256,84 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
             cosigner: cosigner,
             baseInput: DutchInput(tokenIn, 1 ether, 1 ether),
             baseOutputs: OutputsBuilder.singleDutch(address(tokenOut), 1 ether, 1 ether, swapper),
+            cosignerData: cosignerData,
+            cosignature: bytes("")
+        });
+        order.cosignature = cosignOrder(order.hash(), cosignerData);
+        SignedOrder memory signedOrder =
+            SignedOrder(abi.encode(order), signOrder(swapperPrivateKey, address(permit2), order));
+        flashMintExecutor.execute(signedOrder, callbackData);
+    }
+
+    function testExecuteRedemption() public {
+        vm.prank(owner);
+        flashMintExecutor.addFlashMintToken(address(eth2x), address(flashMintLeveraged));
+
+        uint256 issueAmount = 1 ether;
+        address setToken = address(eth2x);
+        uint256 setAmount = issueAmount;
+        address inputOutputToken = address(underlyingToken);
+        uint256 inputOutputTokenAmount = 0.012 ether;
+
+        address eth2xWhale = 0x4bfaeAC6A2266a492394C37E020179059B118622;
+        vm.prank(eth2xWhale);
+        eth2x.transfer(swapper, issueAmount);
+
+        OutputToken[] memory outputs = new OutputToken[](1);
+        outputs[0].token = inputOutputToken;
+        outputs[0].amount = inputOutputTokenAmount;
+        outputs[0].recipient = swapper;
+
+
+        address[] memory path = new address[](2);
+        path[0] = address(underlyingToken);
+        path[1] = address(usdc);
+
+        uint24[] memory fees = new uint24[](1);
+        fees[0] = 500;
+
+        DEXAdapter.SwapData memory swapDataCollateralToDebt = DEXAdapter.SwapData({ 
+            path: path,
+            fees: fees,
+            pool: address(0),
+            exchange: 3
+        });
+        DEXAdapter.SwapData memory swapDataInputOutputToken = emptySwapData;
+
+        bytes memory flashMintCallData = abi.encodeWithSelector(
+            IFlashMintLeveraged.redeemExactSetForERC20.selector,
+            setToken,
+            setAmount,
+            inputOutputToken,
+            inputOutputTokenAmount,
+            swapDataCollateralToDebt,
+            swapDataInputOutputToken
+        );
+
+        bytes memory callbackData = abi.encode(
+            setToken,
+            address(flashMintLeveraged),
+            inputOutputToken,
+            false,
+            flashMintCallData
+        );
+
+        CosignerData memory cosignerData = CosignerData({
+            decayStartTime: block.timestamp,
+            decayEndTime: block.timestamp + 100,
+            exclusiveFiller: address(0),
+            exclusivityOverrideBps: 0,
+            inputAmount: 1 ether,
+            outputAmounts: ArrayBuilder.fill(1, 0.01 ether)
+        });
+
+        ERC20 tokenIn = ERC20(address(eth2x));
+        ERC20 tokenOut = underlyingToken;
+        V2DutchOrder memory order = V2DutchOrder({
+            info: OrderInfoBuilder.init(address(v2DutchOrderReactor)).withSwapper(swapper),
+            cosigner: cosigner,
+            baseInput: DutchInput(tokenIn, 1 ether, 1 ether),
+            baseOutputs: OutputsBuilder.singleDutch(address(tokenOut), 0.01 ether, 0.01 ether, swapper),
             cosignerData: cosignerData,
             cosignature: bytes("")
         });
