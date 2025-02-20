@@ -61,6 +61,7 @@ contract FlashMintExecutorBaseIntegrationTest is Test, PermitSignature, DeployPe
 
     // Max input amount to spent in issuance
     uint256 inputTokenAmount = 0.5 ether;
+    uint256 outputTokenAmount = 0.25 ether;
 
     uint256 setAmount = 1 ether;
 
@@ -122,9 +123,7 @@ contract FlashMintExecutorBaseIntegrationTest is Test, PermitSignature, DeployPe
         ERC20 tokenIn = underlyingToken;
         address tokenOut = address(eth2x);
 
-        console.log("block.basefee: %d", block.basefee);
         uint256 priorityFee = block.basefee + 1000;
-        console.log("priorityFee: %d", priorityFee);
         vm.txGasPrice(priorityFee);
 
         uint256 inputMpsPerPriorityFeeWei = 1;
@@ -136,9 +135,54 @@ contract FlashMintExecutorBaseIntegrationTest is Test, PermitSignature, DeployPe
 
         PriorityInput memory input = PriorityInput({token: tokenIn, amount: inputTokenAmount, mpsPerPriorityFeeWei: inputMpsPerPriorityFeeWei});
         uint256 scaledInputAmount = input.scale(priorityFee).amount;
-        console.log("scaledInputAmount: %d", scaledInputAmount);
 
         bytes memory callbackData = generateIssuanceCallbackData(scaledInputAmount);
+
+        PriorityCosignerData memory cosignerData = PriorityCosignerData({auctionTargetBlock: block.number});
+
+        PriorityOrder memory order = PriorityOrder({
+            info: OrderInfoBuilder.init(address(priorityOrderReactor)).withSwapper(swapper).withDeadline(deadline),
+            cosigner: vm.addr(cosignerPrivateKey),
+            auctionStartBlock: block.number,
+            baselinePriorityFeeWei: 0,
+            input: input,
+            outputs: outputs,
+            cosignerData: cosignerData,
+            cosignature: bytes("")
+        });
+        order.cosignature = cosignOrder(order.hash(), cosignerData);
+
+        _checkPermit2Nonce(swapper, order.info.nonce);
+
+        SignedOrder memory signedOrder =
+            SignedOrder(abi.encode(order), signOrder(swapperPrivateKey, address(permit2), order));
+        flashMintExecutor.execute(signedOrder, callbackData);
+    }
+
+    function testExecuteRedemption() public {
+        vm.prank(owner);
+        flashMintExecutor.addFlashMintToken(address(eth2x), address(flashMintLeveraged));
+
+        ERC20 tokenIn = ERC20(address(eth2x));
+        address tokenOut = address(underlyingToken);
+
+        address eth2xWhale = 0x0B173b9014a0A36aAC51eE4957BC8c7E20686d3F;
+        vm.prank(eth2xWhale);
+        eth2x.transfer(swapper, setAmount);
+
+        uint256 priorityFee = block.basefee + 1000;
+        vm.txGasPrice(priorityFee);
+
+        uint256 inputMpsPerPriorityFeeWei = 0;
+        uint256 outputMpsPerPriorityFeeWei = 1; // exact input
+        uint256 deadline = block.timestamp + 1000;
+
+        PriorityOutput[] memory outputs =
+            OutputsBuilder.singlePriority(tokenOut, outputTokenAmount, outputMpsPerPriorityFeeWei, address(swapper));
+
+        PriorityInput memory input = PriorityInput({token: tokenIn, amount: setAmount, mpsPerPriorityFeeWei: inputMpsPerPriorityFeeWei});
+
+        bytes memory callbackData = generateRedemptionCallbackData();
 
         PriorityCosignerData memory cosignerData = PriorityCosignerData({auctionTargetBlock: block.number});
 
@@ -200,14 +244,50 @@ contract FlashMintExecutorBaseIntegrationTest is Test, PermitSignature, DeployPe
 
     }
 
+    function generateRedemptionCallbackData() internal view returns(bytes memory callbackData){
+        // Swapdata copied from this tx: https://basescan.org/tx/0xc9becf9480aba0753a7e9af6c59a12ad73b4c7159e7165b05368c2bb28dc5383
+        address[] memory path = new address[](3);
+        path[0] = address(underlyingToken);
+        path[1] = dai;
+        path[2] = address(usdc);
+
+        uint24[] memory fees = new uint24[](2);
+        fees[0] = 500;
+        fees[1] = 100;
+
+        DEXAdapter.SwapData memory swapDataCollateralToDebt = DEXAdapter.SwapData({ 
+            path: path,
+            fees: fees,
+            pool: address(0),
+            exchange: 3
+        });
+        DEXAdapter.SwapData memory swapDataInputOutputToken = emptySwapData;
+
+        bytes memory flashMintCallData = abi.encodeWithSelector(
+            IFlashMintLeveraged.redeemExactSetForERC20.selector,
+            setToken,
+            setAmount,
+            underlyingToken,
+            outputTokenAmount,
+            swapDataCollateralToDebt,
+            swapDataInputOutputToken
+        );
+
+        return abi.encode(
+            setToken,
+            address(flashMintLeveraged),
+            underlyingToken,
+            false,
+            flashMintCallData
+        );
+
+    }
+
     function _checkPermit2Nonce(address swapper, uint256 nonce) internal view {
         uint256 wordPos = uint248(nonce >> 8);
         uint256 bit = 1 << uint8(nonce); // bitPos
         uint256 bitmap = permit2.nonceBitmap(swapper, wordPos);
         uint256 flipped = bitmap ^ bit;
-        console.log("bitmap: %d", bitmap);
-        console.log("flipped: %d", flipped);
-        console.log("bit: %d", bit);
     }
 
 }
