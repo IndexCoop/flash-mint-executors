@@ -1,66 +1,24 @@
-## Foundry
+# FlashMintExecutors
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+FlashMintExecutors are a suite of smart contracts that enable Index Coop products to be filled via the UniswapX protocol. They dynamically route orders to the appropriate FlashMint contract (for issuance or redemption).
 
-Foundry consists of:
+# Deployment Addresses
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+| Contract | Network | Address |
+|----------|---------|---------|
+| FlashMintExecutor | Ethereum | - |
+| FlashMintExecutor | Base | - |
+| FlashMintExecutor | Arbitrum | - |
 
-## Documentation
+# Usage
 
-https://book.getfoundry.sh/
-
-## Usage
-
-### Build
-
-```shell
-$ forge build
 ```
+# install dependencies
+forge install
 
-### Test
+# compile contracts
+forge build
 
-```shell
-$ forge test
-```
-
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
+# run unit tests
+forge test
 ```
