@@ -1,0 +1,12 @@
+[submodule "lib/forge-std"]
+	path = lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "lib/uniswapx"]
+	path = lib/uniswapx
+	url = https://github.com/uniswap/uniswapx
+[submodule "lib/index-protocol"]
+	path = lib/index-protocol
+	url = https://github.com/indexcoop/index-protocol
+[submodule "lib/index-coop-smart-contracts"]
+	path = lib/index-coop-smart-contracts
+	url = https://github.com/indexcoop/index-coop-smart-contracts
