@@ -123,15 +123,12 @@ contract FlashMintExecutor is IReactorCallback, Owned {
             )
         );
 
-        // TODO: Review why unchecked
-        unchecked {
-            (address setTokenApproveTarget, address inputOutputTokenApproveTarget) = isIssuance 
-                ? (address(reactor), flashMintContract) 
-                : (flashMintContract, address(reactor));
+        (address setTokenApproveTarget, address inputOutputTokenApproveTarget) = isIssuance 
+            ? (address(reactor), flashMintContract) 
+            : (flashMintContract, address(reactor));
 
-            ERC20(setToken).safeApprove(setTokenApproveTarget, type(uint256).max);
-            ERC20(inputOutputToken).safeApprove(inputOutputTokenApproveTarget, type(uint256).max);
-        }
+        ERC20(setToken).safeApprove(setTokenApproveTarget, type(uint256).max);
+        ERC20(inputOutputToken).safeApprove(inputOutputTokenApproveTarget, type(uint256).max);
 
         require(flashMintEnabled[setToken][flashMintContract], "FlashMint not enabled for set token");
         if (isIssuance) {
