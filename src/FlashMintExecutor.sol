@@ -112,20 +112,10 @@ contract FlashMintExecutor is IReactorCallback, Owned {
             address inputOutputToken,
             bool isIssuance,
             bytes memory flashMintCalldata
-        ) = abi.decode(
-            callbackData,
-            (
-                address,
-                address,
-                address,
-                bool,
-                bytes
-            )
-        );
+        ) = abi.decode(callbackData, (address, address, address, bool, bytes));
 
-        (address setTokenApproveTarget, address inputOutputTokenApproveTarget) = isIssuance 
-            ? (address(reactor), flashMintContract) 
-            : (flashMintContract, address(reactor));
+        (address setTokenApproveTarget, address inputOutputTokenApproveTarget) =
+            isIssuance ? (address(reactor), flashMintContract) : (flashMintContract, address(reactor));
 
         ERC20(setToken).safeApprove(setTokenApproveTarget, type(uint256).max);
         ERC20(inputOutputToken).safeApprove(inputOutputTokenApproveTarget, type(uint256).max);

@@ -22,11 +22,11 @@ interface IFlashMintDexV5 {
 
     /* ============ Events ============ */
 
+    // The issued SetToken
+    // The address of the input asset(ERC20/ETH) used to issue the SetTokens
+    // The amount of input tokens used for issuance
+    // The amount of SetTokens received by the recipient
     event FlashMint( // The recipient address of the issued SetTokens
-        // The issued SetToken
-        // The address of the input asset(ERC20/ETH) used to issue the SetTokens
-        // The amount of input tokens used for issuance
-        // The amount of SetTokens received by the recipient
         address indexed _recipient,
         address indexed _setToken,
         address indexed _inputToken,
@@ -34,11 +34,11 @@ interface IFlashMintDexV5 {
         uint256 _amountSetIssued
     );
 
+    // The redeemed SetToken
+    // The address of output asset(ERC20/ETH) received by the recipient
+    // The amount of SetTokens redeemed for output tokens
+    // The amount of output tokens received by the recipient
     event FlashRedeem( // The recipient address which redeemed the SetTokens
-        // The redeemed SetToken
-        // The address of output asset(ERC20/ETH) received by the recipient
-        // The amount of SetTokens redeemed for output tokens
-        // The amount of output tokens received by the recipient
         address indexed _recipient,
         address indexed _setToken,
         address indexed _outputToken,

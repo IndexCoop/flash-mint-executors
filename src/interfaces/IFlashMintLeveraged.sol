@@ -2,7 +2,6 @@
 pragma solidity ^0.8.4;
 
 library DEXAdapter {
-
     struct Addresses {
         address quickRouter;
         address sushiRouter;

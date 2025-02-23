@@ -34,15 +34,13 @@ contract MockFlashMint is IFlashMintDexV5 {
         return requiredAmount;
     }
 
-    function getRedeemExactSet(
-        address _setToken,
-        uint256 _setAmount,
-        SwapData memory,
-        SwapData memory
-    ) public returns (uint256) {
+    function getRedeemExactSet(address _setToken, uint256 _setAmount, SwapData memory, SwapData memory)
+        public
+        returns (uint256)
+    {
         MockSetToken setToken = MockSetToken(_setToken);
         uint256 outputAmount = _setAmount * 1 ether / setToken.underlyingUnit();
-        
+
         return outputAmount;
     }
 
@@ -64,20 +62,15 @@ contract MockFlashMint is IFlashMintDexV5 {
         SwapData memory _swapDataCollateralForDebt,
         SwapData memory _swapDataOutputToken
     ) external {
-        uint256 outputAmount = getRedeemExactSet(_setToken, _setAmount, _swapDataCollateralForDebt, _swapDataOutputToken);
+        uint256 outputAmount =
+            getRedeemExactSet(_setToken, _setAmount, _swapDataCollateralForDebt, _swapDataOutputToken);
         require(outputAmount >= _minAmountOutputToken, "Insufficient output amount");
 
         MockSetToken setToken = MockSetToken(_setToken);
         ERC20(setToken).transferFrom(msg.sender, address(setToken), _setAmount);
         setToken.redeem(msg.sender, _setAmount);
-        
-        emit FlashRedeem(
-            msg.sender,
-            _setToken,
-            address(setToken.underlyingToken()),
-            _setAmount,
-            outputAmount
-        );
+
+        emit FlashRedeem(msg.sender, _setToken, address(setToken.underlyingToken()), _setAmount, outputAmount);
     }
 
     function issueExactSetFromERC20(
@@ -89,25 +82,15 @@ contract MockFlashMint is IFlashMintDexV5 {
         SwapData memory _swapDataInputToken
     ) external {
         uint256 requiredAmount = getIssueExactSet(
-            _setToken, 
-            _setAmount, 
-            _maxAmountInputToken,
-            _swapDataDebtForCollateral,
-            _swapDataInputToken
+            _setToken, _setAmount, _maxAmountInputToken, _swapDataDebtForCollateral, _swapDataInputToken
         );
 
         MockSetToken setToken = MockSetToken(_setToken);
         ERC20(setToken.underlyingToken()).transferFrom(msg.sender, address(this), requiredAmount);
         ERC20(setToken.underlyingToken()).approve(address(setToken), requiredAmount);
         setToken.issue(msg.sender, _setAmount);
-        
-        emit FlashMint(
-            msg.sender,
-            _setToken,
-            address(setToken.underlyingToken()),
-            requiredAmount,
-            _setAmount
-        );
+
+        emit FlashMint(msg.sender, _setToken, address(setToken.underlyingToken()), requiredAmount, _setAmount);
     }
 
     function issueExactSetFromETH(

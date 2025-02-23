@@ -38,7 +38,7 @@ contract FlashMintExecutorBaseIntegrationTest is Test, PermitSignature, DeployPe
     address public owner;
     address public nonOwner;
 
-    uint256  underlyingUnit;
+    uint256 underlyingUnit;
     Vm.Wallet cosignerWallet;
     address cosigner;
     uint256 cosignerPrivateKey;
@@ -48,7 +48,7 @@ contract FlashMintExecutorBaseIntegrationTest is Test, PermitSignature, DeployPe
     DEXAdapter.SwapData emptySwapData;
 
     // Base test setup
-    uint256 testBlock = 26614000;
+    uint256 testBlock = 26615000;
     IReactor priorityOrderReactor = IReactor(0x000000001Ec5656dcdB24D90DFa42742738De729);
     IPermit2 permit2 = IPermit2(0x000000000022D473030F116dDEE9F6B43aC78BA3);
 
@@ -83,7 +83,6 @@ contract FlashMintExecutorBaseIntegrationTest is Test, PermitSignature, DeployPe
         owner = msg.sender;
         underlyingUnit = 2 ether;
 
-
         cosigner = cosignerWallet.addr;
         cosignerPrivateKey = cosignerWallet.privateKey;
 
@@ -99,22 +98,20 @@ contract FlashMintExecutorBaseIntegrationTest is Test, PermitSignature, DeployPe
         vm.stopPrank();
 
         flashMintExecutor = new FlashMintExecutor(priorityOrderReactor, owner);
-        
-        emptySwapData = DEXAdapter.SwapData({
-            path: new address[](0),
-            fees: new uint24[](0),
-            pool: address(0),
-            exchange: 0
-        });
+
+        emptySwapData =
+            DEXAdapter.SwapData({path: new address[](0), fees: new uint24[](0), pool: address(0), exchange: 0});
     }
 
-    function cosignOrder(bytes32 orderHash, PriorityCosignerData memory cosignerData) private view returns (bytes memory sig) {
+    function cosignOrder(bytes32 orderHash, PriorityCosignerData memory cosignerData)
+        private
+        view
+        returns (bytes memory sig)
+    {
         bytes32 msgHash = keccak256(abi.encodePacked(orderHash, abi.encode(cosignerData)));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(cosignerPrivateKey, msgHash);
         sig = bytes.concat(r, s, bytes1(v));
     }
-
-
 
     function testExecuteIssuance() public {
         vm.prank(owner);
@@ -133,7 +130,8 @@ contract FlashMintExecutorBaseIntegrationTest is Test, PermitSignature, DeployPe
         PriorityOutput[] memory outputs =
             OutputsBuilder.singlePriority(tokenOut, setAmount, outputMpsPerPriorityFeeWei, address(swapper));
 
-        PriorityInput memory input = PriorityInput({token: tokenIn, amount: inputTokenAmount, mpsPerPriorityFeeWei: inputMpsPerPriorityFeeWei});
+        PriorityInput memory input =
+            PriorityInput({token: tokenIn, amount: inputTokenAmount, mpsPerPriorityFeeWei: inputMpsPerPriorityFeeWei});
         uint256 scaledInputAmount = input.scale(priorityFee).amount;
 
         bytes memory callbackData = generateIssuanceCallbackData(scaledInputAmount);
@@ -180,7 +178,8 @@ contract FlashMintExecutorBaseIntegrationTest is Test, PermitSignature, DeployPe
         PriorityOutput[] memory outputs =
             OutputsBuilder.singlePriority(tokenOut, outputTokenAmount, outputMpsPerPriorityFeeWei, address(swapper));
 
-        PriorityInput memory input = PriorityInput({token: tokenIn, amount: setAmount, mpsPerPriorityFeeWei: inputMpsPerPriorityFeeWei});
+        PriorityInput memory input =
+            PriorityInput({token: tokenIn, amount: setAmount, mpsPerPriorityFeeWei: inputMpsPerPriorityFeeWei});
 
         bytes memory callbackData = generateRedemptionCallbackData();
 
@@ -205,7 +204,11 @@ contract FlashMintExecutorBaseIntegrationTest is Test, PermitSignature, DeployPe
         flashMintExecutor.execute(signedOrder, callbackData);
     }
 
-    function generateIssuanceCallbackData(uint256 scaledInputAmount) internal view returns(bytes memory callbackData){
+    function generateIssuanceCallbackData(uint256 scaledInputAmount)
+        internal
+        view
+        returns (bytes memory callbackData)
+    {
         // Swapdata copied from this tx: https://basescan.org/tx/0xc9becf9480aba0753a7e9af6c59a12ad73b4c7159e7165b05368c2bb28dc5383
         address[] memory path = new address[](3);
         path[0] = address(usdc);
@@ -216,12 +219,8 @@ contract FlashMintExecutorBaseIntegrationTest is Test, PermitSignature, DeployPe
         fees[0] = 100;
         fees[1] = 500;
 
-        DEXAdapter.SwapData memory swapDataDebtToCollateral = DEXAdapter.SwapData({ 
-            path: path,
-            fees: fees,
-            pool: address(0),
-            exchange: 3
-        });
+        DEXAdapter.SwapData memory swapDataDebtToCollateral =
+            DEXAdapter.SwapData({path: path, fees: fees, pool: address(0), exchange: 3});
         DEXAdapter.SwapData memory swapDataInputOutputToken = emptySwapData;
 
         bytes memory flashMintCallData = abi.encodeWithSelector(
@@ -234,17 +233,10 @@ contract FlashMintExecutorBaseIntegrationTest is Test, PermitSignature, DeployPe
             swapDataInputOutputToken
         );
 
-        return abi.encode(
-            setToken,
-            address(flashMintLeveraged),
-            underlyingToken,
-            true,
-            flashMintCallData
-        );
-
+        return abi.encode(setToken, address(flashMintLeveraged), underlyingToken, true, flashMintCallData);
     }
 
-    function generateRedemptionCallbackData() internal view returns(bytes memory callbackData){
+    function generateRedemptionCallbackData() internal view returns (bytes memory callbackData) {
         // Swapdata copied from this tx: https://basescan.org/tx/0xc9becf9480aba0753a7e9af6c59a12ad73b4c7159e7165b05368c2bb28dc5383
         address[] memory path = new address[](3);
         path[0] = address(underlyingToken);
@@ -255,12 +247,8 @@ contract FlashMintExecutorBaseIntegrationTest is Test, PermitSignature, DeployPe
         fees[0] = 500;
         fees[1] = 100;
 
-        DEXAdapter.SwapData memory swapDataCollateralToDebt = DEXAdapter.SwapData({ 
-            path: path,
-            fees: fees,
-            pool: address(0),
-            exchange: 3
-        });
+        DEXAdapter.SwapData memory swapDataCollateralToDebt =
+            DEXAdapter.SwapData({path: path, fees: fees, pool: address(0), exchange: 3});
         DEXAdapter.SwapData memory swapDataInputOutputToken = emptySwapData;
 
         bytes memory flashMintCallData = abi.encodeWithSelector(
@@ -273,14 +261,7 @@ contract FlashMintExecutorBaseIntegrationTest is Test, PermitSignature, DeployPe
             swapDataInputOutputToken
         );
 
-        return abi.encode(
-            setToken,
-            address(flashMintLeveraged),
-            underlyingToken,
-            false,
-            flashMintCallData
-        );
-
+        return abi.encode(setToken, address(flashMintLeveraged), underlyingToken, false, flashMintCallData);
     }
 
     function _checkPermit2Nonce(address swapper, uint256 nonce) internal view {
@@ -289,5 +270,4 @@ contract FlashMintExecutorBaseIntegrationTest is Test, PermitSignature, DeployPe
         uint256 bitmap = permit2.nonceBitmap(swapper, wordPos);
         uint256 flipped = bitmap ^ bit;
     }
-
 }

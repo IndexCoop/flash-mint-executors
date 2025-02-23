@@ -40,7 +40,7 @@ contract FlashMintExecutorTest is Test, PermitSignature, DeployPermit2 {
     MockFlashMint mockFlashMint;
 
     FlashMintExecutor flashMintExecutor;
-    
+
     IFlashMintDexV5.SwapData emptySwapData;
 
     uint256 constant ONE = 10 ** 18;
@@ -111,7 +111,7 @@ contract FlashMintExecutorTest is Test, PermitSignature, DeployPermit2 {
 
         IFlashMintDexV5.SwapData memory swapDataCollateral = emptySwapData;
         IFlashMintDexV5.SwapData memory swapDataInputOutputToken = emptySwapData;
-        
+
         bytes memory flashMintCallData = abi.encodeWithSelector(
             IFlashMintDexV5.issueExactSetFromERC20.selector,
             setToken,
@@ -122,13 +122,8 @@ contract FlashMintExecutorTest is Test, PermitSignature, DeployPermit2 {
             swapDataInputOutputToken
         );
 
-        bytes memory callbackData = abi.encode(
-            setToken,
-            address(mockFlashMint),
-            inputOutputToken,
-            true,
-            flashMintCallData
-        );
+        bytes memory callbackData =
+            abi.encode(setToken, address(mockFlashMint), inputOutputToken, true, flashMintCallData);
 
         ResolvedOrder[] memory resolvedOrders = new ResolvedOrder[](1);
         bytes memory sig = hex"1234";
@@ -165,7 +160,9 @@ contract FlashMintExecutorTest is Test, PermitSignature, DeployPermit2 {
 
         vm.prank(owner);
         flashMintExecutor.addFlashMintToken(address(mockSetToken), address(mockFlashMint));
-        assertTrue(flashMintExecutor.flashMintEnabled(address(mockSetToken), address(mockFlashMint)), "Token should be enabled");
+        assertTrue(
+            flashMintExecutor.flashMintEnabled(address(mockSetToken), address(mockFlashMint)), "Token should be enabled"
+        );
     }
 
     function testCannotAddFlashMintTokenWithZeroAddresses() public {
@@ -194,7 +191,10 @@ contract FlashMintExecutorTest is Test, PermitSignature, DeployPermit2 {
         vm.prank(owner);
         flashMintExecutor.removeFlashMintToken(address(mockSetToken), address(mockFlashMint));
 
-        assertFalse(flashMintExecutor.flashMintEnabled(address(mockSetToken), address(mockFlashMint)), "Token should be disabled");
+        assertFalse(
+            flashMintExecutor.flashMintEnabled(address(mockSetToken), address(mockFlashMint)),
+            "Token should be disabled"
+        );
     }
 
     function testCannotRemoveFlashMintTokenIfNotOwner() public {

@@ -1,6 +1,6 @@
 pragma solidity ^0.8.0;
-import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
+import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 /**
  * @title ISetToken
@@ -9,7 +9,6 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
  * Interface for operating with SetTokens.
  */
 interface ISetToken is IERC20 {
-
     /* ============ Enums ============ */
 
     enum ModuleState {
@@ -38,21 +37,21 @@ interface ISetToken is IERC20 {
 
     /**
      * A struct that stores a component's cash position details and external positions
-     * This data structure allows O(1) access to a component's cash position units and 
+     * This data structure allows O(1) access to a component's cash position units and
      * virtual units.
      *
      * @param virtualUnit               Virtual value of a component's DEFAULT position. Stored as virtual for efficiency
      *                                  updating all units at once via the position multiplier. Virtual units are achieved
      *                                  by dividing a "real" value by the "positionMultiplier"
-     * @param componentIndex            
+     * @param componentIndex
      * @param externalPositionModules   List of external modules attached to each external position. Each module
      *                                  maps to an external position
      * @param externalPositions         Mapping of module => ExternalPosition struct for a given component
      */
     struct ComponentPosition {
-      int256 virtualUnit;
-      address[] externalPositionModules;
-      mapping(address => ExternalPosition) externalPositions;
+        int256 virtualUnit;
+        address[] externalPositionModules;
+        mapping(address => ExternalPosition) externalPositions;
     }
 
     /**
@@ -63,13 +62,12 @@ interface ISetToken is IERC20 {
      * @param data              Arbitrary data
      */
     struct ExternalPosition {
-      int256 virtualUnit;
-      bytes data;
+        int256 virtualUnit;
+        bytes data;
     }
 
-
     /* ============ Functions ============ */
-    
+
     function addComponent(address _component) external;
     function removeComponent(address _component) external;
     function editDefaultPositionUnit(address _component, int256 _realUnit) external;
@@ -78,7 +76,7 @@ interface ISetToken is IERC20 {
     function editExternalPositionUnit(address _component, address _positionModule, int256 _realUnit) external;
     function editExternalPositionData(address _component, address _positionModule, bytes calldata _data) external;
 
-    function invoke(address _target, uint256 _value, bytes calldata _data) external returns(bytes memory);
+    function invoke(address _target, uint256 _value, bytes calldata _data) external returns (bytes memory);
 
     function editPositionMultiplier(int256 _newMultiplier) external;
 
@@ -97,21 +95,24 @@ interface ISetToken is IERC20 {
     function manager() external view returns (address);
     function moduleStates(address _module) external view returns (ModuleState);
     function getModules() external view returns (address[] memory);
-    
-    function getDefaultPositionRealUnit(address _component) external view returns(int256);
-    function getExternalPositionRealUnit(address _component, address _positionModule) external view returns(int256);
-    function getComponents() external view returns(address[] memory);
-    function getExternalPositionModules(address _component) external view returns(address[] memory);
-    function getExternalPositionData(address _component, address _positionModule) external view returns(bytes memory);
-    function isExternalPositionModule(address _component, address _module) external view returns(bool);
-    function isComponent(address _component) external view returns(bool);
-    
+
+    function getDefaultPositionRealUnit(address _component) external view returns (int256);
+    function getExternalPositionRealUnit(address _component, address _positionModule) external view returns (int256);
+    function getComponents() external view returns (address[] memory);
+    function getExternalPositionModules(address _component) external view returns (address[] memory);
+    function getExternalPositionData(address _component, address _positionModule)
+        external
+        view
+        returns (bytes memory);
+    function isExternalPositionModule(address _component, address _module) external view returns (bool);
+    function isComponent(address _component) external view returns (bool);
+
     function positionMultiplier() external view returns (int256);
     function getPositions() external view returns (Position[] memory);
-    function getTotalComponentRealUnits(address _component) external view returns(int256);
+    function getTotalComponentRealUnits(address _component) external view returns (int256);
 
-    function isInitializedModule(address _module) external view returns(bool);
-    function isPendingModule(address _module) external view returns(bool);
+    function isInitializedModule(address _module) external view returns (bool);
+    function isPendingModule(address _module) external view returns (bool);
     function isLocked() external view returns (bool);
     function locker() external view returns (address);
 }

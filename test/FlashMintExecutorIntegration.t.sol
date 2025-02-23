@@ -41,7 +41,7 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
     address public nonOwner;
 
     address underlyingTokenWhale = 0x8EB8a3b98659Cce290402893d0123abb75E3ab28;
-    uint256  underlyingUnit;
+    uint256 underlyingUnit;
     Vm.Wallet cosignerWallet;
     address cosigner;
     uint256 cosignerPrivateKey;
@@ -55,7 +55,7 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
     ERC20 usdc = ERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
 
     FlashMintExecutor flashMintExecutor;
-    
+
     DEXAdapter.SwapData emptySwapData;
 
     uint256 constant ONE = 10 ** 18;
@@ -74,7 +74,6 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
         owner = msg.sender;
         underlyingUnit = 2 ether;
 
-
         cosigner = cosignerWallet.addr;
         cosignerPrivateKey = cosignerWallet.privateKey;
 
@@ -90,13 +89,9 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
         vm.stopPrank();
 
         flashMintExecutor = new FlashMintExecutor(v2DutchOrderReactor, owner);
-        
-        emptySwapData = DEXAdapter.SwapData({
-            path: new address[](0),
-            fees: new uint24[](0),
-            pool: address(0),
-            exchange: 0
-        });
+
+        emptySwapData =
+            DEXAdapter.SwapData({path: new address[](0), fees: new uint24[](0), pool: address(0), exchange: 0});
     }
 
     function cosignOrder(bytes32 orderHash, CosignerData memory cosignerData) private view returns (bytes memory sig) {
@@ -214,12 +209,8 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
         uint24[] memory fees = new uint24[](1);
         fees[0] = 500;
 
-        DEXAdapter.SwapData memory swapDataDebtToCollateral = DEXAdapter.SwapData({ 
-            path: path,
-            fees: fees,
-            pool: address(0),
-            exchange: 3
-        });
+        DEXAdapter.SwapData memory swapDataDebtToCollateral =
+            DEXAdapter.SwapData({path: path, fees: fees, pool: address(0), exchange: 3});
         DEXAdapter.SwapData memory swapDataInputOutputToken = emptySwapData;
 
         bytes memory flashMintCallData = abi.encodeWithSelector(
@@ -232,13 +223,8 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
             swapDataInputOutputToken
         );
 
-        bytes memory callbackData = abi.encode(
-            setToken,
-            address(flashMintLeveraged),
-            inputOutputToken,
-            true,
-            flashMintCallData
-        );
+        bytes memory callbackData =
+            abi.encode(setToken, address(flashMintLeveraged), inputOutputToken, true, flashMintCallData);
 
         CosignerData memory cosignerData = CosignerData({
             decayStartTime: block.timestamp,
@@ -284,7 +270,6 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
         outputs[0].amount = inputOutputTokenAmount;
         outputs[0].recipient = swapper;
 
-
         address[] memory path = new address[](2);
         path[0] = address(underlyingToken);
         path[1] = address(usdc);
@@ -292,12 +277,8 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
         uint24[] memory fees = new uint24[](1);
         fees[0] = 500;
 
-        DEXAdapter.SwapData memory swapDataCollateralToDebt = DEXAdapter.SwapData({ 
-            path: path,
-            fees: fees,
-            pool: address(0),
-            exchange: 3
-        });
+        DEXAdapter.SwapData memory swapDataCollateralToDebt =
+            DEXAdapter.SwapData({path: path, fees: fees, pool: address(0), exchange: 3});
         DEXAdapter.SwapData memory swapDataInputOutputToken = emptySwapData;
 
         bytes memory flashMintCallData = abi.encodeWithSelector(
@@ -310,13 +291,8 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
             swapDataInputOutputToken
         );
 
-        bytes memory callbackData = abi.encode(
-            setToken,
-            address(flashMintLeveraged),
-            inputOutputToken,
-            false,
-            flashMintCallData
-        );
+        bytes memory callbackData =
+            abi.encode(setToken, address(flashMintLeveraged), inputOutputToken, false, flashMintCallData);
 
         CosignerData memory cosignerData = CosignerData({
             decayStartTime: block.timestamp,
@@ -355,6 +331,4 @@ contract FlashMintExecutorIntegrationTest is Test, PermitSignature, DeployPermit
         // cosigner signs over (orderHash || cosignerData)
         address signer = ecrecover(keccak256(abi.encodePacked(orderHash, abi.encode(order.cosignerData))), v, r, s);
     }
-
-
 }
